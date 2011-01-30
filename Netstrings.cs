@@ -22,7 +22,7 @@ namespace Crypto
         }
 
         /// <summary>
-        /// Decodes the specified netstring and returns its payload. For streams of netstrings use the netstring object instead of multiple calls to this method.
+        /// Decodes a single netstring and returns its payload. For streams of netstrings use the netstring object instead of multiple calls to this method.
         /// </summary>
         /// <param name="value">The netstring to decode.</param>
         /// <exception cref="System.OverflowException" />Raised if value requests a size greater than Int32.MaxLength characters.</exception>
@@ -64,9 +64,19 @@ namespace Crypto
         }
 
         /// <summary>
+        /// Convenience method which constructs a StringReader for value.
+        /// </summary>
+        /// <param name="value">A string containing one or more complete netstrings.</param>
+        /// <param name="maxLength">The maximum length allowed for any one netstring.</param>
+        public Netstrings(String value, int maxLength = Int32.MaxValue) : this(new StringReader(value), maxLength)
+        {
+        }
+
+        /// <summary>
         /// Constructs a new Netsrings instance which will emit netstrings found in reader.
         /// </summary>
         /// <param name="reader">A stream of netstrings.</param>
+        /// /// <param name="maxLength">The maximum length allowed for any one netstring.</param>
         public Netstrings(TextReader reader, int maxLength = Int32.MaxValue)
         {
             this.reader = reader;
@@ -80,7 +90,7 @@ namespace Crypto
         private string current;
 
         /// <summary>
-        /// The maximum length possible for any one netstring.
+        /// The maximum length allowed for any one netstring.
         /// </summary>
         public int MaxLength
         {
@@ -115,6 +125,8 @@ namespace Crypto
         {
             int? read = null;
 
+            // do not read on first entry to the loop if there is a backlog in builder and you already have a netstring
+            // there  might be another netstring available without consuming from the stream
             while ((builder.Length > 0 && this.current != null) || (read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0)
             {
                 if (read != null)
@@ -122,6 +134,7 @@ namespace Crypto
                     builder.Append(buffer, 0, (int)read);
                 }
 
+                // if a netstring is not found on this pass, setting current to null will trigger another read
                 this.current = null;
                 read = null;
 
