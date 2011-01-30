@@ -3,7 +3,7 @@ About
 
 Netstrings.cs is an implementation of the netstrings protocol (http://cr.yp.to/proto/netstrings.txt)
 
-You can emit or decode single netstrings with the static methods @Netstrings.Encode(string value)@ and @Netstrings.Decode(string value)@.
+You can emit or decode single netstrings with the static methods <code>Netstrings.Encode(string value)</code> and <code>Netstrings.Decode(string value)</code>.
 
 You can also use the class to decode a stream of netstrings (such as a network socket):
 
