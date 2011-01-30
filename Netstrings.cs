@@ -79,11 +79,14 @@ namespace Crypto
         private StringBuilder builder;
         private string current;
 
-		public int MaxLength
-		{
-			get { return this.builder.MaxCapacity; }
-		}
-		
+        /// <summary>
+        /// The maximum length possible for any one netstring.
+        /// </summary>
+        public int MaxLength
+        {
+            get { return this.builder.MaxCapacity; }
+        }
+
         /// <summary>
         /// The most recently read netstring in reader.
         /// </summary>
@@ -110,16 +113,19 @@ namespace Crypto
         /// <returns>false if Netstrings is at the end of the stream.</returns>
         public bool MoveNext()
         {
-            int read = 0;
+            int? read = null;
 
-            while (builder.Length > 0 || (read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0)
+            while ((builder.Length > 0 && this.current != null) || (read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0)
             {
-                if (read > 0)
+                if (read != null)
                 {
-                    builder.Append(buffer, 0, read);
+                    builder.Append(buffer, 0, (int)read);
                 }
 
-                if (this.size == null && builder.Length > 0)
+                this.current = null;
+                read = null;
+
+                if (this.size == null)
                 {
                     Match match = Netstrings.SizePattern.Match(builder.ToString());
 
@@ -149,10 +155,6 @@ namespace Crypto
                         }
                     }
                 }
-                else
-                {
-                    throw new InvalidDataException("Size field terminator not found");
-                }
 
                 if (this.size != null)
                 {
@@ -180,6 +182,18 @@ namespace Crypto
                         return true;
                     }
                 }
+                else
+                {
+                    if (builder.Length > 10)
+                    {
+                        throw new InvalidDataException("Size field terminator not found");
+                    }
+                }
+            }
+
+            if (builder.Length > 0)
+            {
+                throw new InvalidDataException("Unexpected EOF");
             }
 
             return false;
