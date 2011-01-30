@@ -1,25 +1,75 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.IO;
-using System.Collections;
 
 namespace Crypto
 {
     class Netstrings : IEnumerator<String>, IEnumerable<String>
     {
-        static readonly Regex SizePattern = new Regex("^(?<size>[1-9]{0,9}[0-9])(?<terminator>:)?");
-        
-        public Netstrings(TextReader reader)
-        {
-            this.reader = reader;
-        }
+        static readonly Regex SizePattern = new Regex("^(?<size>[1-9]{0,9}[0-9])(?<terminator>:)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+        /// <summary>
+        /// Emits the specified string as a netstring.
+        /// </summary>
+        /// <param name="value">The string to encode as a netstring.</param>
+        /// <returns>A netstring.</returns>
         public static string Encode(string value)
         {
             return String.Format("{0}:{1},", value.Length, value);
+        }
+
+        /// <summary>
+        /// Decodes the specified netstring and returns its payload.
+        /// </summary>
+        /// <param name="value">The netstring to decode.</param>
+        /// <exception cref="System.OverflowException" />Raised if value requests a size greater than Int32.MaxLength characters.</exception>
+        /// <exception cref="System.IO.InvalidDataException">Raised if value does not strictly adhere to the netstring protocol.</exception>
+        /// <returns>The value of this netstring.</returns>
+        public static string Decode(string value)
+        {
+            Match match = Netstrings.SizePattern.Match(value);
+
+            if (match.Success == false || match.Groups["terminator"].Success == false)
+            {
+                throw new InvalidDataException("Illegal size field");
+            }
+
+            Group sizeGroup = match.Groups["size"];
+
+            int size = Convert.ToInt32(sizeGroup.Value);
+
+            value = value.Remove(0, match.Length);
+
+            if (value.Length == size + 1)
+            {
+                try
+                {
+                    return value.Substring(0, size);
+                }
+                finally
+                {
+                    if (value.Remove(0, size) != ",")
+                    {
+                        throw new InvalidDataException("Payload terminator not found");
+                    }
+                }
+            }
+            else
+            {
+                throw new InvalidDataException("Exceeded requested size");
+            }
+        }
+
+        /// <summary>
+        /// Constructs a new Netsrings instance which will emit netstrings found in reader.
+        /// </summary>
+        /// <param name="reader">A stream of netstrings.</param>
+        public Netstrings(TextReader reader)
+        {
+            this.reader = reader;
         }
 
         private int? size;
@@ -28,6 +78,9 @@ namespace Crypto
         private StringBuilder builder = new StringBuilder(4096, 40960);
         private string current;
 
+        /// <summary>
+        /// The most recently read netstring in reader.
+        /// </summary>
         public string Current
         {
             get { return this.current; }
@@ -35,6 +88,7 @@ namespace Crypto
 
         public void Dispose()
         {
+            this.reader.Dispose();
         }
 
         object IEnumerator.Current
@@ -42,6 +96,12 @@ namespace Crypto
             get { return this.current; }
         }
 
+        /// <summary>
+        /// Advances reader until a complete netstring is found.
+        /// </summary>
+        /// <exception cref="System.OverflowException" />Raised if value requests a size greater than Int32.MaxLength characters.</exception>
+        /// <exception cref="System.IO.InvalidDataException">Raised if value does not strictly adhere to the netstring protocol.</exception>
+        /// <returns>false if Netstrings is at the end of the stream.</returns>
         public bool MoveNext()
         {
             int read;
@@ -82,7 +142,7 @@ namespace Crypto
                 {
                     throw new InvalidDataException("Size field terminator not found");
                 }
-                
+
                 if (this.size != null)
                 {
                     int size = (int)this.size;
