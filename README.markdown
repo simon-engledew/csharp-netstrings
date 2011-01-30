@@ -1,22 +1,19 @@
 About
 =====
 
-Netstrings.cs is an implementation of the netstrings protocol ( http://cr.yp.to/proto/netstrings.txt )
+Netstrings.cs is an implementation of the netstrings protocol (<a href="http://cr.yp.to/proto/netstrings.txt">http://cr.yp.to/proto/netstrings.txt</a>)
 
-You can emit or decode single netstrings with the static methods <code>Netstrings.Encode(string value)</code> and <code>Netstrings.Decode(string value)</code>.
+You can emit or decode single netstrings with the static methods <code>NetstringWriter.Encode(string value)</code> and <code>NetstringReader.Decode(string value)</code>.
 
 You can also use the class to decode a stream of netstrings (such as a network socket):
 
 	using System;
-	using System.Collections.Generic;
-	using System.Linq;
-	using System.Text;
 	using System.IO;
-	using System.Net.Sockets;
 	using System.Net;
+	using System.Net.Sockets;
 	using System.Threading;
 
-	namespace Crypto
+	namespace Netstrings
 	{
 		class Program
 		{
@@ -35,7 +32,7 @@ You can also use the class to decode a stream of netstrings (such as a network s
 
 					NetworkStream stream = new NetworkStream(client);
 					
-					foreach (string s in new Netstrings(new StreamReader(stream)))
+					foreach (string s in new NetstringReader(new StreamReader(stream)))
 					{
 						Console.WriteLine(s);
 					}
@@ -54,7 +51,7 @@ You can also use the class to decode a stream of netstrings (such as a network s
 
 					NetworkStream stream = new NetworkStream(client);
 
-					StreamWriter writer = new StreamWriter(stream);
+					NetstringWriter writer = new NetstringWriter(new StreamWriter(stream));
 
 					string input = null;
 
@@ -62,7 +59,7 @@ You can also use the class to decode a stream of netstrings (such as a network s
 					{
 						input = Console.ReadLine();
 
-						writer.Write(Netstrings.Encode(input));
+						writer.Write(input);
 						writer.Flush();
 					}
 
@@ -77,3 +74,7 @@ You can also use the class to decode a stream of netstrings (such as a network s
 			}
 		}
 	}
+
+The library is a bit weird and asymmetrical and I'll probably change my mind about how it all fits together at some point, but it works and it seems to be quite fast. Hopefully someone else can get some use out of it too.
+
+Released under the MIT licence.

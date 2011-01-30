@@ -1,3 +1,23 @@
+// Copyright (c) 2011 Simon Engledew
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,12 +25,10 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Crypto
+namespace Netstrings
 {
-    class Netstrings : IEnumerator<String>, IEnumerable<String>
+    class NetstringWriter
     {
-        static readonly Regex SizePattern = new Regex("^(?<size>[1-9]{0,9}[0-9])(?<terminator>:)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
         /// <summary>
         /// Emits the specified string as a netstring.
         /// </summary>
@@ -21,6 +39,33 @@ namespace Crypto
             return String.Format("{0}:{1},", value.Length, value);
         }
 
+        private TextWriter writer;
+
+        public NetstringWriter(TextWriter writer)
+        {
+            this.writer = writer;
+        }
+
+        public void Write(string value)
+        {
+            this.writer.Write(NetstringWriter.Encode(value));
+        }
+
+        public void WriteLine(string value)
+        {
+            this.writer.Write(NetstringWriter.Encode(String.Concat(value, Environment.NewLine)));
+        }
+
+        public void Flush()
+        {
+            this.writer.Flush();
+        }
+    }
+
+    class NetstringReader : IEnumerator<String>, IEnumerable<String>
+    {
+        static readonly Regex SizePattern = new Regex("^(?<size>[1-9]{0,9}[0-9])(?<terminator>:)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         /// <summary>
         /// Decodes a single netstring and returns its payload. For streams of netstrings use the netstring object instead of multiple calls to this method.
         /// </summary>
@@ -30,7 +75,7 @@ namespace Crypto
         /// <returns>The value of this netstring.</returns>
         public static string Decode(string value)
         {
-            Match match = Netstrings.SizePattern.Match(value);
+            Match match = NetstringReader.SizePattern.Match(value);
 
             if (match.Success == false || match.Groups["terminator"].Success == false)
             {
@@ -68,7 +113,7 @@ namespace Crypto
         /// </summary>
         /// <param name="value">A string containing one or more complete netstrings.</param>
         /// <param name="maxLength">The maximum length allowed for any one netstring.</param>
-        public Netstrings(String value, int maxLength = Int32.MaxValue) : this(new StringReader(value), maxLength)
+        public NetstringReader(String value, int maxLength = Int32.MaxValue) : this(new StringReader(value), maxLength)
         {
         }
 
@@ -77,7 +122,7 @@ namespace Crypto
         /// </summary>
         /// <param name="reader">A stream of netstrings.</param>
         /// /// <param name="maxLength">The maximum length allowed for any one netstring.</param>
-        public Netstrings(TextReader reader, int maxLength = Int32.MaxValue)
+        public NetstringReader(TextReader reader, int maxLength = Int32.MaxValue)
         {
             this.reader = reader;
             this.builder = new StringBuilder(2048, maxLength);
@@ -127,7 +172,7 @@ namespace Crypto
 
             // do not read on first entry to the loop if there is a backlog in builder and you already have a netstring
             // there  might be another netstring available without consuming from the stream
-            while ((builder.Length > 0 && this.current != null) || (read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0)
+            while ((builder.Length > 0 && this.current != null) || (read = reader.Read(buffer, 0, buffer.Length)) > 0)
             {
                 if (read != null)
                 {
@@ -140,7 +185,7 @@ namespace Crypto
 
                 if (this.size == null)
                 {
-                    Match match = Netstrings.SizePattern.Match(builder.ToString());
+                    Match match = NetstringReader.SizePattern.Match(builder.ToString());
 
                     if (match.Success == false)
                     {
@@ -228,3 +273,4 @@ namespace Crypto
         }
     }
 }
+
