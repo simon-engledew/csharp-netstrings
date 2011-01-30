@@ -22,7 +22,7 @@ namespace Crypto
         }
 
         /// <summary>
-        /// Decodes the specified netstring and returns its payload.
+        /// Decodes the specified netstring and returns its payload. For streams of netstrings use the netstring object instead of multiple calls to this method.
         /// </summary>
         /// <param name="value">The netstring to decode.</param>
         /// <exception cref="System.OverflowException" />Raised if value requests a size greater than Int32.MaxLength characters.</exception>
@@ -67,17 +67,23 @@ namespace Crypto
         /// Constructs a new Netsrings instance which will emit netstrings found in reader.
         /// </summary>
         /// <param name="reader">A stream of netstrings.</param>
-        public Netstrings(TextReader reader)
+        public Netstrings(TextReader reader, int maxLength = Int32.MaxValue)
         {
             this.reader = reader;
+            this.builder = new StringBuilder(2048, maxLength);
         }
 
         private int? size;
         private char[] buffer = new char[2048];
         private TextReader reader;
-        private StringBuilder builder = new StringBuilder(4096, 40960);
+        private StringBuilder builder;
         private string current;
 
+		public int MaxLength
+		{
+			get { return this.builder.MaxCapacity; }
+		}
+		
         /// <summary>
         /// The most recently read netstring in reader.
         /// </summary>
@@ -104,16 +110,16 @@ namespace Crypto
         /// <returns>false if Netstrings is at the end of the stream.</returns>
         public bool MoveNext()
         {
-            int read;
+            int read = 0;
 
-            while ((read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0 || builder.Length > 0)
+            while (builder.Length > 0 || (read = reader.ReadBlock(buffer, 0, buffer.Length)) > 0)
             {
                 if (read > 0)
                 {
                     builder.Append(buffer, 0, read);
                 }
 
-                if (this.size == null && read > 0)
+                if (this.size == null && builder.Length > 0)
                 {
                     Match match = Netstrings.SizePattern.Match(builder.ToString());
 
@@ -128,13 +134,18 @@ namespace Crypto
 
                         this.size = Convert.ToInt32(sizeGroup.Value);
 
+                        if (this.size > this.MaxLength)
+                        {
+                            throw new OverflowException("Requested size exceeded maximum length");
+                        }
+
                         builder.Remove(0, match.Length);
                     }
                     else
                     {
                         if (builder.Length > 10)
                         {
-                            throw new OverflowException("Exceeded maximum size");
+                            throw new OverflowException("Size field exceeded maximum width");
                         }
                     }
                 }
